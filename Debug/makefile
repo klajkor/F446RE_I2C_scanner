@@ -10,6 +10,7 @@ RM := rm -rf
 -include sources.mk
 -include Drivers/STM32F4xx_HAL_Driver/Src/subdir.mk
 -include Core/Startup/subdir.mk
+-include Core/Src/bmp280/subdir.mk
 -include Core/Src/subdir.mk
 -include subdir.mk
 -include objects.mk
@@ -55,7 +56,7 @@ main-build: F446RE_I2C_scanner.elf secondary-outputs
 
 # Tool invocations
 F446RE_I2C_scanner.elf: $(OBJS) $(USER_OBJS) C:\Users\Robert_Klajko\OneDrive\ -\ EPAM\Prog\STM32\STM32CubeIDE\workspace\F446RE_I2C_scanner\STM32F446RETX_FLASH.ld
-	arm-none-eabi-gcc -o "F446RE_I2C_scanner.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\Robert_Klajko\OneDrive - EPAM\Prog\STM32\STM32CubeIDE\workspace\F446RE_I2C_scanner\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="F446RE_I2C_scanner.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+	arm-none-eabi-gcc -o "F446RE_I2C_scanner.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\Robert_Klajko\OneDrive - EPAM\Prog\STM32\STM32CubeIDE\workspace\F446RE_I2C_scanner\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="F446RE_I2C_scanner.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -u _printf_float -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

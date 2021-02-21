@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <string.h>
+#include "bmp280/bmp280.h"
 
 /* USER CODE END Includes */
 
@@ -47,6 +48,16 @@ I2C_HandleTypeDef hi2c1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+BMP280_HandleTypedef bmp280;
+
+float pressure, temperature, humidity;
+bool bme280p;
+bool bmp280_module_present;
+uint16_t size;
+uint8_t Data[256];
+
+char crlf[3];
+
 
 /* USER CODE END PV */
 
@@ -58,6 +69,8 @@ static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 
 static void I2C_Scanner(void);
+static void BMP280_Init(void);
+static void BMP280_Read_and_Print(void);
 
 /* USER CODE END PFP */
 
@@ -102,18 +115,32 @@ int main(void)
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
-	char Message[21];
-	sprintf(Message, "\r\n\r\n>Scan start\r\n");
-	HAL_UART_Transmit(&huart2, (uint8_t*)Message, sizeof(Message), HAL_MAX_DELAY);
+	char Message_buf[14];
+	sprintf(Message_buf, ">Scan started");
+	sprintf(crlf, "\r\n");
+	HAL_UART_Transmit(&huart2, (uint8_t*)crlf, sizeof(crlf), HAL_MAX_DELAY);
+	HAL_UART_Transmit(&huart2, (uint8_t*)crlf, sizeof(crlf), HAL_MAX_DELAY);
+	HAL_UART_Transmit(&huart2, (uint8_t*)Message_buf, sizeof(Message_buf), HAL_MAX_DELAY);
+	HAL_UART_Transmit(&huart2, (uint8_t*)crlf, sizeof(crlf), HAL_MAX_DELAY);
+
+	bmp280_module_present = false;
 	I2C_Scanner();
+
+	if (bmp280_module_present)
+	{
+		BMP280_Init();
+	}
 
 	while (1)
 	{
 
-		HAL_Delay(2000);
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
+		if (bmp280_module_present)
+		{
+			BMP280_Read_and_Print();
+		}
 	}
 	/* USER CODE END 3 */
 }
@@ -272,8 +299,6 @@ static void I2C_Scanner(void)
 	//char* period = ".";
 	//char* dash = "-";
 	char OutputArray[7];
-	char crlf[3];
-	sprintf(crlf, "\r\n");
 	for (i = 1; i < 128; i++)
 	{
 		result = HAL_I2C_IsDeviceReady(&hi2c1, (uint16_t)(i << 1), 1, HAL_MAX_DELAY);
@@ -288,6 +313,10 @@ static void I2C_Scanner(void)
 
 		if (result == HAL_OK)
 		{
+			if (i == BMP280_I2C_ADDRESS_0)
+			{
+				bmp280_module_present = true;
+			}
 			sprintf(OutputArray, " ACK! "); // Received an ACK at that address
 			HAL_UART_Transmit(&huart2, (uint8_t*)OutputArray, sizeof(OutputArray), HAL_MAX_DELAY);
 		}
@@ -298,12 +327,56 @@ static void I2C_Scanner(void)
 			HAL_UART_Transmit(&huart2, (uint8_t*)crlf, sizeof(crlf), HAL_MAX_DELAY);
 		}
 
-		HAL_Delay(25);
+		HAL_Delay(5);
 	}
 	HAL_UART_Transmit(&huart2, (uint8_t*)crlf, sizeof(crlf), HAL_MAX_DELAY);
 	sprintf(OutputArray, ">Done."); // Received an ACK at that address
 	HAL_UART_Transmit(&huart2, (uint8_t*)OutputArray, sizeof(OutputArray), HAL_MAX_DELAY);
 	HAL_UART_Transmit(&huart2, (uint8_t*)crlf, sizeof(crlf), HAL_MAX_DELAY);
+}
+
+static void BMP280_Init(void)
+{
+	bmp280_init_default_params(&bmp280.params);
+	bmp280.addr = BMP280_I2C_ADDRESS_0;
+	bmp280.i2c = &hi2c1;
+	HAL_UART_Transmit(&huart2, (uint8_t*)crlf, sizeof(crlf), HAL_MAX_DELAY);
+
+	while (!bmp280_init(&bmp280, &bmp280.params)) {
+		size = sprintf((char *)Data, "BMP280 initialization failed");
+		HAL_UART_Transmit(&huart2, Data, size, 1000);
+		HAL_UART_Transmit(&huart2, (uint8_t*)crlf, sizeof(crlf), HAL_MAX_DELAY);
+		HAL_Delay(2000);
+	}
+	bme280p = bmp280.id == BME280_CHIP_ID;
+	size = sprintf((char *)Data, "BMP280: found %s", bme280p ? "BME280" : "BMP280");
+	HAL_UART_Transmit(&huart2, Data, size, 1000);
+	HAL_UART_Transmit(&huart2, (uint8_t*)crlf, sizeof(crlf), HAL_MAX_DELAY);
+}
+
+static void BMP280_Read_and_Print(void)
+{
+	HAL_Delay(100);
+	while (!bmp280_read_float(&bmp280, &temperature, &pressure, &humidity))
+	{
+		size = sprintf((char *)Data,"Temperature/pressure reading failed");
+		HAL_UART_Transmit(&huart2, Data, size, 1000);
+		HAL_UART_Transmit(&huart2, (uint8_t*)crlf, sizeof(crlf), HAL_MAX_DELAY);
+		HAL_Delay(2000);
+	}
+	size = sprintf((char *)Data,"Pressure: %.2f Pa, Temperature: %.2f C",pressure, temperature);
+	HAL_UART_Transmit(&huart2, Data, size, 1000);
+	if (bme280p) {
+		size = sprintf((char *)Data,", Humidity: %.2f", humidity);
+		HAL_UART_Transmit(&huart2, Data, size, 1000);
+	}
+	else
+	{
+		size = sprintf((char *)Data, "\n");
+		HAL_UART_Transmit(&huart2, Data, size, 1000);
+	}
+	HAL_UART_Transmit(&huart2, (uint8_t*)crlf, sizeof(crlf), HAL_MAX_DELAY);
+	HAL_Delay(2400);
 }
 
 /* USER CODE END 4 */
